@@ -1,12 +1,12 @@
 use anyhow::Result;
 
-mod getdbsnp;
-mod download;
 mod checkmd5;
-
-use getdbsnp::{dbsnp_latest_release, download_dbsnp};
+mod download;
+mod getannotations;
+mod getdbsnp;
 
 fn main() -> Result<()> {
-    download_dbsnp(true)?;
+    getannotations::download_annotations()?;
+    println!("Done from main");
     Ok(())
 }
