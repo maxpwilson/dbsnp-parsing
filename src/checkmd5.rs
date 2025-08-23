@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use anyhow::Result;
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use indicatif::{ProgressBar, ProgressStyle};
 use md5::{Digest, Md5};
 use std::fs;
 use std::io::{BufReader, Read, copy};
@@ -13,14 +13,17 @@ pub fn md5_hash_file(filepath: String) -> Result<String> {
     let hash = hasher.finalize();
     Ok(format!("{:x}", hash))
 }
-pub fn md5_hash_file_verbose(filepath: String, multipb: Option<MultiProgress>) -> Result<String> {
+pub fn md5_hash_file_verbose(filepath: String, pb: Option<ProgressBar>) -> Result<String> {
     let file = fs::File::open(&filepath)?;
     let filesize = file.metadata().unwrap().len();
     let mut hasher = Md5::new();
     let mut source = BufReader::new(file);
     let mut buffer = [0u8; 8192];
-    let pb = match multipb {
-        Some(p) => p.add(ProgressBar::new(filesize)),
+    let pb = match pb {
+        Some(p) => {
+            p.set_length(filesize);
+            p
+        }
         None => ProgressBar::new(filesize),
     };
     pb.set_style(
@@ -28,7 +31,7 @@ pub fn md5_hash_file_verbose(filepath: String, multipb: Option<MultiProgress>) -
                 "{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})",
             )
             .unwrap()
-            .progress_chars("##-"),
+            .progress_chars(">>-"),
         );
     loop {
         let bytes_read = source.read(&mut buffer)?;

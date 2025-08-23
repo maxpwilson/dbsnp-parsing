@@ -1,12 +1,5 @@
 use anyhow::Result;
-
-mod checkmd5;
-mod download;
-mod getannotations;
-mod getdbsnp;
-
 fn main() -> Result<()> {
-    getannotations::download_annotations()?;
-    println!("Done from main");
+    snp_parsing::alignment::ALIGNMENTS.query(1, 10000, 100000);
     Ok(())
 }

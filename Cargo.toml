@@ -11,3 +11,5 @@ md-5 = "0.10.6"
 bam = "0.1.4"
 tokio = { version = "1.47.1", features = ["full"] }
 futures = "0.3.31"
+spin = "0.10.0"
+lazy_static = "1.5.0"

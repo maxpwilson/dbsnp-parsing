@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use anyhow::{Context, Result};
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::Client;
 use reqwest::Response;
 use std::fs::{File, remove_file};
@@ -58,13 +58,17 @@ impl Download {
         file.write_all(&content)?;
         Ok(())
     }
-    pub async fn verbose_download(&self, multipb: Option<MultiProgress>) -> Result<()> {
+    pub async fn verbose_download(&self, pb: Option<ProgressBar>) -> Result<()> {
         let mut response = self.get_response().await?;
         let download_size = response.content_length().unwrap_or(0);
-        let pb = match multipb {
-            Some(p) => p.add(ProgressBar::new(download_size)),
+        let pb = match pb {
+            Some(p) => {
+                p.set_length(download_size);
+                p
+            }
             None => ProgressBar::new(download_size),
         };
+
         pb.set_style(
             ProgressStyle::with_template(
                 "{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})",

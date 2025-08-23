@@ -1,17 +1,17 @@
 #![allow(dead_code)]
 
+use crate::alignment::{KNOWNFILE, LOCALPATH, MODELFILE};
 use crate::checkmd5::md5_hash_file_verbose;
 use crate::download::Download;
 use anyhow::{Context, Result};
-use indicatif::MultiProgress;
+use indicatif::{MultiProgress, ProgressBar};
+use lazy_static::lazy_static;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
+use std::sync::RwLock;
 
-const LOCALPATH: &str = "../downloads/";
 const ANNOTSERVER: &str = "https://ftp.ncbi.nlm.nih.gov/genomes/refseq/vertebrate_mammalian/Homo_sapiens/reference/GCF_000001405.40_GRCh38.p14/";
 const MD5FILE: &str = "md5checksums.txt";
-const KNOWNFILE: &str = "GCF_000001405.40_GRCh38.p14_knownrefseq_alns.bam";
-const MODELFILE: &str = "GCF_000001405.40_GRCh38.p14_modelrefseq_alns.bam";
 
 fn annot_folder() -> Option<String> {
     Some(ANNOTSERVER.to_string() + "RefSeq_transcripts_alignments/")
@@ -62,14 +62,16 @@ async fn get_hash(filename: &str) -> Option<String> {
 }
 
 #[tokio::main]
-pub async fn download_annotations() -> Result<()> {
-    let dls = annot_dls().context("Failed to get annotation downloads")?;
+pub async fn download_alignments() -> Result<()> {
+    let dls = annot_dls().context("Failed to get alignment downloads")?;
     let mut handles = vec![];
-    let m = MultiProgress::new();
+    lazy_static! {
+        pub static ref MP: RwLock<MultiProgress> = RwLock::new(MultiProgress::new());
+    }
     for dl in dls {
-        let m_clone = m.clone();
         handles.push(tokio::task::spawn(async move {
-            dl.verbose_download(Some(m_clone.clone())).await.unwrap();
+            let pb = MP.write().unwrap().add(ProgressBar::new(0));
+            dl.verbose_download(Some(pb)).await.unwrap();
             if dl.filename != MD5FILE.to_string() {
                 let hash = match get_hash(
                     &("./RefSeq_transcripts_alignments/".to_string() + &dl.filename),
@@ -82,9 +84,10 @@ pub async fn download_annotations() -> Result<()> {
                         return;
                     }
                 };
-                let calc_hash =
-                    md5_hash_file_verbose(LOCALPATH.to_string() + &dl.filename, Some(m_clone))
-                        .unwrap();
+                let calc_hash = {
+                    let pb = MP.write().unwrap().add(ProgressBar::new(0));
+                    md5_hash_file_verbose(LOCALPATH.to_string() + &dl.filename, Some(pb)).unwrap()
+                };
                 if calc_hash != hash {
                     println!("hash {} calced {}", hash, calc_hash);
                     eprintln!("Hash mismatch for {}", dl.filename);
@@ -92,8 +95,8 @@ pub async fn download_annotations() -> Result<()> {
             };
         }));
     }
-    m.clear().unwrap();
     futures::future::join_all(handles).await;
+    MP.write().unwrap().clear().unwrap();
     println!("Finished downloading");
     Ok(())
 }
